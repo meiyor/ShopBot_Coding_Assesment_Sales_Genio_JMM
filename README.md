@@ -60,4 +60,8 @@ Now you must run the **app.py** code just invoking the Python command as follows
 python app.py
 ```
 
+After you run this main invoking code be sure that this API is running on the local address **127.0.0.1/8000** IP address ansd port. Be sure your terminal show the following verbose
+![image](https://github.com/user-attachments/assets/9d934b82-bf05-4d77-871d-424dd28addac)
+
+
 For a general information about how to use the this API and the code, please check this explanatory videp [https://drive.google.com/file/d/13GNCuubAO7gFk7jnhEOUeOYYFv5kOylb/view?usp=sharing](https://drive.google.com/file/d/13GNCuubAO7gFk7jnhEOUeOYYFv5kOylb/view?usp=sharing).
