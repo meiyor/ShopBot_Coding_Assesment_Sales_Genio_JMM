@@ -47,10 +47,10 @@ Next, we must set the password, for this particular case, the password is **Data
 ALTER USER postgres PASSWORD 'Password';
 ```
 
-Now, from outside the psql terminal, and being on your root terminal you must create the database name associated to the **postgres** like this.
+Now, from outside the psql terminal, and being on your root terminal you must create the database name associated to the **postgres** like this. For this particular case this database is called **Shopdb**.
 
 ```bash
-createdb -U postgres apidb;
+createdb -U postgres Shopdb;
 ```
 You can finish the postgresql configuration just restarting the service again. Then, you are ready to deploy the API from the local Python environment.
 
