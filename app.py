@@ -352,17 +352,17 @@ tools = [
         "type": "function",
         "function": {
             "name": "getInformation",
-            "description": "Give the description and prices values associated to the product_name given in the text after 'user: '",
+            "description": "Give the description and prices values associated with the user input. This is NOT the product_name! Only the information required. ",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "price": {
                         "type": "string",
-                        "description": "The exact value of price associated with the string given in the text after 'user: ' as product_name, price values must be taken from the JSON input catalog. Only give the associated price value! The query should be returned in plain text"
+                        "description": "The value of price associated with the product given in the text after 'user: '. This is NOT the product_name! Only give the associated price value! The query should be returned in plain text"
                     },
                     "description_val": {
                         "type": "string",
-                        "description": "The exact value of description associated with the string given in the text after 'user: ' as product_name, description values must be taken from the JSON input catalog. Only give the associated description value! The query should be returned in plain text"
+                        "description": "The value of description associated with the product given in the text after 'user: '. This is NOT the product_name! Only give the associated description value! The query should be returned in plain text"
                     },
                 },
                 "required": ["price", "description_val"],
