@@ -358,11 +358,11 @@ tools = [
                 "properties": {
                     "price": {
                         "type": "string",
-                        "description": "The exact value of price associated with the string given in the text after 'user: ' as product_name, price values must be taken from the JSON input catalog. The query should be returned in plain text"
+                        "description": "The exact value of price associated with the string given in the text after 'user: ' as product_name, price values must be taken from the JSON input catalog. Only give the associated price value! The query should be returned in plain text"
                     },
                     "description_val": {
                         "type": "string",
-                        "description": "The exact value of description associated with the string given in the text after 'user: ' as product_name, description values must be taken from the JSON input catalog. The query should be returned in plain text"
+                        "description": "The exact value of description associated with the string given in the text after 'user: ' as product_name, description values must be taken from the JSON input catalog. Only give the associated description value! The query should be returned in plain text"
                     },
                 },
                 "required": ["price", "description_val"],
