@@ -462,8 +462,8 @@ def predict(Data=ShopData, DataProduct=ShopData_Product, db=db, tools=tools):
 
      :param Data: An ShopData object defined in the models_database module
      This defines the parameters of the database but to add a new item on it.
-     :param Data: An ShopData_Prodict object defined in the models_database module
-     As the product_name, price, description, and stock_availability as strings for
+     :param Data: An ShopData_Product object defined in the models_database module,
+     such as, the product_name, price, description, and stock_availability as strings for
      the postgresql db.
      :param db: This is a SQLAlchemy database session as Postgresql. This initialized
      before any app function will run.
