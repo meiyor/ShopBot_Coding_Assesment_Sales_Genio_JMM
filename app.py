@@ -583,7 +583,7 @@ def predict(Data=ShopData, DataProduct=ShopData_Product, db=db, tools=tools):
         code=code_str,
         date=time_now,
         username=username,
-        Interaction=response_text)
+        Interaction="user: " + text + ", ShopBot: " + response_text)
 
     # add a new register to the database
     db.session.add(register)
