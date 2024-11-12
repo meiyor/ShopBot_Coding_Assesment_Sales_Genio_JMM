@@ -18,6 +18,8 @@ from models_database import db, ShopData, ShopData_Product
 import openai
 from openai import OpenAI
 from waiting import wait
+from typing_extensions import override
+from openai import AssistantEventHandler
 
 # import this for the ShopAPI purposes
 import json
@@ -61,51 +63,47 @@ with app.app_context():
 
 CORS(app)
 
+# define the class stream handler for GPT stream mode
 
-def run_handler_poll(run=None):
+
+class EventHandler(AssistantEventHandler):
     """
-    This function Polls the status of the GPT assistant run until it is either completed, requires action,
-    fails, or expires.
+    This event handlet that polls the status of the GPT assistant run until it is either completed,
+    requires action, fails, or expires.
     If the run fails or expires, it raises an exception with an error message. If the run
     requires action, it prepares and returns tool output information. If the run completes,
     it returns None.
-
-    :param run : object, optional
-     An GPT assistant's run object that represents a run object with 'status' attribute,
-     which could be "completed", "failed", "expired", or "requires_action". If 'status'
-     is "requires_action", it should also have a `required_action` attribute to handle
-     tool outputs.
-
-    :return: tuple
-     If the GPT run requires action, returns a tuple containing:
-     - tool_output (list of dict): A list of dictionaries with tool output information,
-       each containing:
-     - tool_call_id (str): The ID of the tool call.
-     - output (str): The output associated with the tool call, initialized as an empty string.
-     - value_return (object): The `submit_tool_outputs` object from the run's required action.
-
-        If the run is completed, returns '(None, None)'.
+    Here the handler is universal for the required actions status.
     """
 
-    status = run.status
-    while status != "completed":
-        if status == 'failed':
-            raise Exception(f"Run failed with error: {run.last_error}")
-        if status == 'expired':
-            raise Exception("Run expired.")
-        if status == 'requires_action':
-            tool_output = []
-            id = run.required_action.submit_tool_outputs.tool_calls[0].id
-            value_return = run.required_action.submit_tool_outputs
-            # make the json object for the tool to be returned
-            tool_output.append({
-                "tool_call_id": id,
-                "output": ""
-            })
+    @override
+    def on_event(self, event):
+        # Retrieve events that are denoted with 'requires_action'
+        # since these will have our tool_calls
+        if event.event == 'thread.run.requires_action':
+            run_id = event.data.id  # Retrieve the run ID from the event data
+            self.handle_requires_action(event.data, run_id)
+            self.data = event.data
+        else:
+            run_id = event.data.id
+            self.data = event.data
 
-            return tool_output, value_return
+    def handle_requires_action(self, data, run_id):
+        tool_outputs = []
 
-        return None, None
+        for tool in data.required_action.submit_tool_outputs.tool_calls:
+            if tool.function.name == "getProductInfo":
+                tool_outputs.append({"tool_call_id": tool.id, "output": ""})
+            elif tool.function.name == "checkStock":
+                tool_outputs.append({"tool_call_id": tool.id, "output": ""})
+            elif tool.function.name == "getInformation":
+                tool_outputs.append({"tool_call_id": tool.id, "output": ""})
+
+        # Submit all tool_outputs at the same time
+        self.data = data
+        self.tool_outputs = tool_outputs
+        self.tool_calls = data.required_action.submit_tool_outputs
+
 
 # define the functions associated with the other GPT tool functions
 
@@ -290,16 +288,22 @@ def getProductInfo(
                 content=text
             )
 
-            # define a new run
-            run_product = client.beta.threads.runs.create_and_poll(
+            # more efficient using stream
+            with client.beta.threads.runs.stream(
                 thread_id=thread.id,
                 assistant_id=assistant.id,
-            )
+                event_handler=EventHandler(),
+            ) as stream:
+                stream.until_done()
+
+            run_product = stream.data
 
             wait(
                 lambda: run_product.status == 'completed',
                 timeout_seconds=60,
                 waiting_for="product run for being completed")
+
+            run_product = stream.data
 
             # process message payload
             messages = client.beta.threads.messages.list(thread_id=thread.id)
@@ -334,28 +338,33 @@ def getProductInfo(
         """
           ** Here you call the getInformation function run **
         """
-        # create the run here and specify the tool_choice to make it easier and
-        # more efficient
-        run_info = client.beta.threads.runs.create_and_poll(
+
+        # stream for being more efficient
+        with client.beta.threads.runs.stream(
             thread_id=thread.id,
             assistant_id=assistant.id,
             instructions="Give priority to this client! Return the tools that are activated by the user message",
             tool_choice={
                 "type": "function",
                 "function": {
-                    "name": "getInformation"}})
+                        "name": "getInformation"}},
+            event_handler=EventHandler(),
+        ) as stream_info:
+            stream_info.until_done()
 
-        # evaluate the getInformation function here
-        # parsing the tool output here after the requied action is processed
-        tool_outputs, tool_value_getinfo = run_handler_poll(run=run_info)
+        info_call = stream_info.tool_calls
 
-        # send the tool outputs back to complete the run
-        if tool_outputs:
-            run_info = client.beta.threads.runs.submit_tool_outputs_and_poll(
+        run_info = stream_info.data
+
+        with client.beta.threads.runs.submit_tool_outputs_stream(
                 thread_id=thread.id,
                 run_id=run_info.id,
-                tool_outputs=tool_outputs
-            )
+                tool_outputs=stream_info.tool_outputs,
+                event_handler=EventHandler(),
+        ) as stream_info:
+            stream_info.until_done()
+
+        run_info = stream_info.data
 
         # waiting for run to be completed
         wait(
@@ -378,28 +387,32 @@ def getProductInfo(
         """
           ** Here you call the checkStock function run **
         """
-        # create the run here and specify the tool_choice to make it easier and
-        # more efficient
-        run_check = client.beta.threads.runs.create_and_poll(
+        # stream for being more efficient
+        with client.beta.threads.runs.stream(
             thread_id=thread.id,
             assistant_id=assistant.id,
             instructions="Give priority to this client! Return the tools that are activated by the user message",
             tool_choice={
                 "type": "function",
                 "function": {
-                    "name": "checkStock"}})
+                        "name": "checkStock"}},
+            event_handler=EventHandler(),
+        ) as stream_check:
+            stream_check.until_done()
 
-        # evaluate the getInformation function here
-        # parsing the tool output here after the requied action is processed
-        tool_outputs, tool_value_check = run_handler_poll(run=run_check)
+        info_check = stream_check.tool_calls
 
-        # send the tool outputs back to complete the run
-        if tool_outputs:
-            run_check = client.beta.threads.runs.submit_tool_outputs_and_poll(
+        run_check = stream_check.data
+
+        with client.beta.threads.runs.submit_tool_outputs_stream(
                 thread_id=thread.id,
                 run_id=run_check.id,
-                tool_outputs=tool_outputs
-            )
+                tool_outputs=stream_check.tool_outputs,
+                event_handler=EventHandler(),
+        ) as stream_check:
+            stream_check.until_done()
+
+        run_check = stream_check.data
 
         # waiting for run to be completed
         wait(
@@ -412,8 +425,8 @@ def getProductInfo(
             thread_id=thread.id)
 
         # here invoke the functions
-        response_check_val = tool_value_check
-        response_info_val = tool_value_getinfo
+        response_check_val = info_check
+        response_info_val = info_call
 
         stock_availability_string, stock_avail = checkStock(
             stock_value=response_check_val, mock_products=mock_products)
@@ -675,26 +688,32 @@ def predict(Data=ShopData, DataProduct=ShopData_Product, db=db, tools=tools):
     )
 
     # create the run here and specify the tool_choice to make it easier and
-    # more efficient
-    run = client.beta.threads.runs.create_and_poll(
-        thread_id=thread.id,
-        assistant_id=assistant.id,
-        instructions="Give priority to this client! Return the tools that are activated by the user message",
-        tool_choice={
+    # more efficient using stream
+    with client.beta.threads.runs.stream(
+            thread_id=thread.id,
+            assistant_id=assistant.id,
+            instructions="Give priority to this client! Return the tools that are activated by the user message",
+            tool_choice={
             "type": "function",
             "function": {
-                "name": "getProductInfo"}})
+                "name": "getProductInfo"}},
+            event_handler=EventHandler(),
+    ) as stream:
+        stream.until_done()
 
-    # parsing the tool output here after the requied action is processed
-    tool_outputs, tool_value_returned = run_handler_poll(run=run)
+    tool_calls = stream.tool_calls.tool_calls
 
-    # send the tool outputs back to complete the run
-    if tool_outputs:
-        run = client.beta.threads.runs.submit_tool_outputs_and_poll(
+    run = stream.data
+
+    with client.beta.threads.runs.submit_tool_outputs_stream(
             thread_id=thread.id,
             run_id=run.id,
-            tool_outputs=tool_outputs
-        )
+            tool_outputs=stream.tool_outputs,
+            event_handler=EventHandler(),
+    ) as stream:
+        stream.until_done()
+
+    run = stream.data
 
     # waiting for run to be completed
     wait(
@@ -711,8 +730,6 @@ def predict(Data=ShopData, DataProduct=ShopData_Product, db=db, tools=tools):
     print(response, 'response_message')
 
     # Step 2: determine if the response from the model includes a tool call.
-    tool_calls = tool_value_returned.tool_calls
-
     print(response, 'response', tool_calls, 'tool_calls')
 
     if tool_calls:
@@ -747,22 +764,26 @@ def predict(Data=ShopData, DataProduct=ShopData_Product, db=db, tools=tools):
     else:
 
         # create the messages here to the thread
-        message_bye = client.beta.threads.messages.create(
-                thread_id=thread.id,
-                role="user",
-                content="user: " + text_sub_val
+        message_product = client.beta.threads.messages.create(
+            thread_id=thread.id,
+            role="user",
+            content=text
         )
 
-        # define a bye run
-        run_bye = client.beta.threads.runs.create_and_poll(
-                thread_id=thread.id,
-                assistant_id=assistant.id,
-        )
+        # more efficient using stream
+        with client.beta.threads.runs.stream(
+            thread_id=thread.id,
+            assistant_id=assistant.id,
+            event_handler=EventHandler(),
+        ) as stream:
+            stream.until_done()
+
+        run_bye = stream.data
 
         wait(
-              lambda: run_bye.status == 'completed',
-              timeout_seconds=60,
-              waiting_for="bye run for being completed")
+            lambda: run_bye.status == 'completed',
+            timeout_seconds=60,
+            waiting_for="bye run for being completed")
 
         # process message payload
         messages_bye = client.beta.threads.messages.list(thread_id=thread.id)
