@@ -253,10 +253,10 @@ def getProductInfo(
     :params tools (Optional): Tools or functions available for GPT model calls, including
      getInformation' and 'checkStock' functions.
     :params thread (Optional): This is the Assistant Thread parsed from the precict function to do the
-     specific query inside this function the thread is always the same for each chatbot session.
+     specific query. Inside this function the thread is always the same for each chatbot session.
     :params assistant (Optional): This is the Assistant object parsed from the precict function to do the
-     specific query inside this function the thread is always the same for each chatbot session and the assistant
-     is always the same for each chatbot session.
+     specific query. Inside this function the thread is always the same for each chatbot session and the assistant
+     is always the same for each chatbot session as well.
 
     :returns: Tuple[str, str, bool, Optional[str], Optional[str], Optional[str], Optional[str]]:
     A tuple containing:
