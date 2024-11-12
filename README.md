@@ -86,4 +86,4 @@ You can then check the **postgresql** to see the different registers obtained in
 
 For general information about how to use the this API and the code, please check this explanatory video [https://drive.google.com/file/d/13GNCuubAO7gFk7jnhEOUeOYYFv5kOylb/view?usp=sharing](https://drive.google.com/file/d/13GNCuubAO7gFk7jnhEOUeOYYFv5kOylb/view?usp=sharing).
 
-For checking the new video, covering the new feature adding the **GPT Assistant API SDK** functions instead of the GPT completions, please refer to this new brief informative video [https://drive.google.com/file/d/1pQz4l0vmfI47dJJJ6Hue1duceYXe1zkb/view?usp=sharing](https://drive.google.com/file/d/1pQz4l0vmfI47dJJJ6Hue1duceYXe1zkb/view?usp=sharing).
+For checking the details, covering the new API feature/update adding the **GPT Assistant API SDK** functions instead of the GPT completions, please refer to this new brief informative video [https://drive.google.com/file/d/1pQz4l0vmfI47dJJJ6Hue1duceYXe1zkb/view?usp=sharing](https://drive.google.com/file/d/1pQz4l0vmfI47dJJJ6Hue1duceYXe1zkb/view?usp=sharing).
