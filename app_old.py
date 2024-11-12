@@ -14,10 +14,8 @@ from bing_image_downloader import downloader
 # import the SQLAlchemy and database support modules
 from models_database import db, ShopData, ShopData_Product
 
-# import openai and waiting modules
+# import openai
 import openai
-from openai import OpenAI
-from waiting import wait
 
 # import this for the ShopAPI purposes
 import json
@@ -38,9 +36,6 @@ warnings.filterwarnings(
 # Initialize the OpenAI API client
 openai.api_key = os.environ['openAI_key']
 
-# set the openAI client for this specific test
-client = OpenAI(api_key=os.environ['openAI_key'])
-
 # define the app object
 app = Flask(__name__)
 
@@ -60,52 +55,6 @@ with app.app_context():
     db.create_all()
 
 CORS(app)
-
-
-def run_handler_poll(run=None):
-    """
-    This function Polls the status of the GPT assistant run until it is either completed, requires action,
-    fails, or expires.
-    If the run fails or expires, it raises an exception with an error message. If the run
-    requires action, it prepares and returns tool output information. If the run completes,
-    it returns None.
-
-    :param run : object, optional
-     An GPT assistant's run object that represents a run object with 'status' attribute,
-     which could be "completed", "failed", "expired", or "requires_action". If 'status'
-     is "requires_action", it should also have a `required_action` attribute to handle
-     tool outputs.
-
-    :return: tuple
-     If the GPT run requires action, returns a tuple containing:
-     - tool_output (list of dict): A list of dictionaries with tool output information,
-       each containing:
-     - tool_call_id (str): The ID of the tool call.
-     - output (str): The output associated with the tool call, initialized as an empty string.
-     - value_return (object): The `submit_tool_outputs` object from the run's required action.
-
-        If the run is completed, returns '(None, None)'.
-    """
-
-    status = run.status
-    while status != "completed":
-        if status == 'failed':
-            raise Exception(f"Run failed with error: {run.last_error}")
-        if status == 'expired':
-            raise Exception("Run expired.")
-        if status == 'requires_action':
-            tool_output = []
-            id = run.required_action.submit_tool_outputs.tool_calls[0].id
-            value_return = run.required_action.submit_tool_outputs
-            # make the json object for the tool to be returned
-            tool_output.append({
-                "tool_call_id": id,
-                "output": ""
-            })
-
-            return tool_output, value_return
-
-        return None, None
 
 # define the functions associated with the other GPT tool functions
 
@@ -230,9 +179,7 @@ def getProductInfo(
         productName=None,
         mock_products=None,
         text=None,
-        tools=None,
-        thread=None,
-        assistant=None):
+        tools=None):
     """
     This function retrieves information about a specific product_name from the Mock catalog,
     including availability, price, description, and associated image, based on a product_name
@@ -252,11 +199,6 @@ def getProductInfo(
     not specified.
     :params tools (Optional): Tools or functions available for GPT model calls, including
      getInformation' and 'checkStock' functions.
-    :params thread (Optional): This is the Assistant Thread parsed from the precict function to do the
-     specific query inside this function the thread is always the same for each chatbot session.
-    :params assistant (Optional): This is the Assistant object parsed from the precict function to do the
-     specific query inside this function the thread is always the same for each chatbot session and the assistant
-     is always the same for each chatbot session.
 
     :returns: Tuple[str, str, bool, Optional[str], Optional[str], Optional[str], Optional[str]]:
     A tuple containing:
@@ -282,30 +224,15 @@ def getProductInfo(
         if 'product' in text.lower() or 'products' in text.lower():
             response_text = 'Please, can you specifiy what product you want to query for..<br><br> These are the products we have in catalog: <br>' + product_names_values
         else:
-
-            # create the messages here to the thread
-            message_product = client.beta.threads.messages.create(
-                thread_id=thread.id,
-                role="user",
-                content=text
+            # create a response prompt based on the input
+            response_specific = openai.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "user", "content": text}
+                ]
             )
 
-            # define a new run
-            run_product = client.beta.threads.runs.create_and_poll(
-                thread_id=thread.id,
-                assistant_id=assistant.id,
-            )
-
-            wait(
-                lambda: run_product.status == 'completed',
-                timeout_seconds=60,
-                waiting_for="product run for being completed")
-
-            # process message payload
-            messages = client.beta.threads.messages.list(thread_id=thread.id)
-            response_specific = messages.data[0].content[0].text.value
-
-            response_text = response_specific + '<br><br> ' + \
+            response_text = response_specific.choices[0].message.content + '<br><br> ' + \
                 'These are the products we have in catalog: <br>' + product_names_values
 
         product_query = False
@@ -316,104 +243,32 @@ def getProductInfo(
 
     # go to the particular selected product and do the specific query
     else:
-
-        # create the json message to the thread for an specific query
-        message_json = client.beta.threads.messages.create(
-            thread_id=thread.id,
-            role="user",
-            content="The JSON input catalog is: " + mock_products
+        # get the endpoint interaction given description and price values
+        response_info = openai.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "user", "content": "The JSON input catalog is: " + mock_products},
+                {"role": "user", "content": "user: " + productName}
+            ],
+            tools=tools,
+            tool_choice={"type": "function", "function": {"name": "getInformation"}}
         )
 
-        # create the user sorted message to the thread for an specific query
-        message_user = client.beta.threads.messages.create(
-            thread_id=thread.id,
-            role="user",
-            content="user: " + productName
+        # get the endpoint for interactions querying for a specific product
+        # name first the stock_availability
+        response_check = openai.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "user", "content": "The JSON input catalog is: " + mock_products},
+                {"role": "user", "content": "user: " + productName}
+            ],
+            tools=tools,
+            tool_choice={"type": "function", "function": {"name": "checkStock"}}
         )
-
-        """
-          ** Here you call the getInformation function run **
-        """
-        # create the run here and specify the tool_choice to make it easier and
-        # more efficient
-        run_info = client.beta.threads.runs.create_and_poll(
-            thread_id=thread.id,
-            assistant_id=assistant.id,
-            instructions="Give priority to this client! Return the tools that are activated by the user message",
-            tool_choice={
-                "type": "function",
-                "function": {
-                    "name": "getInformation"}})
-
-        # evaluate the getInformation function here
-        # parsing the tool output here after the requied action is processed
-        tool_outputs, tool_value_getinfo = run_handler_poll(run=run_info)
-
-        # send the tool outputs back to complete the run
-        if tool_outputs:
-            run_info = client.beta.threads.runs.submit_tool_outputs_and_poll(
-                thread_id=thread.id,
-                run_id=run_info.id,
-                tool_outputs=tool_outputs
-            )
-
-        # waiting for run to be completed
-        wait(
-            lambda: run_info.status == 'completed',
-            timeout_seconds=60,
-            waiting_for="run info for being completed")
-
-        # receiving the corresponding payload
-        messages_response_getinfo = client.beta.threads.messages.list(
-            thread_id=thread.id)
-
-        # create the user sorted message to the thread for an specific query
-        # again
-        message_user = client.beta.threads.messages.create(
-            thread_id=thread.id,
-            role="user",
-            content="user: " + productName
-        )
-
-        """
-          ** Here you call the checkStock function run **
-        """
-        # create the run here and specify the tool_choice to make it easier and
-        # more efficient
-        run_check = client.beta.threads.runs.create_and_poll(
-            thread_id=thread.id,
-            assistant_id=assistant.id,
-            instructions="Give priority to this client! Return the tools that are activated by the user message",
-            tool_choice={
-                "type": "function",
-                "function": {
-                    "name": "checkStock"}})
-
-        # evaluate the getInformation function here
-        # parsing the tool output here after the requied action is processed
-        tool_outputs, tool_value_check = run_handler_poll(run=run_check)
-
-        # send the tool outputs back to complete the run
-        if tool_outputs:
-            run_check = client.beta.threads.runs.submit_tool_outputs_and_poll(
-                thread_id=thread.id,
-                run_id=run_check.id,
-                tool_outputs=tool_outputs
-            )
-
-        # waiting for run to be completed
-        wait(
-            lambda: run_check.status == 'completed',
-            timeout_seconds=60,
-            waiting_for="run check for being completed")
-
-        # receiving the corresponding payload
-        messages_response_getcheck = client.beta.threads.messages.list(
-            thread_id=thread.id)
 
         # here invoke the functions
-        response_check_val = tool_value_check
-        response_info_val = tool_value_getinfo
+        response_check_val = response_check.choices[0].message
+        response_info_val = response_info.choices[0].message
 
         stock_availability_string, stock_avail = checkStock(
             stock_value=response_check_val, mock_products=mock_products)
@@ -562,45 +417,24 @@ def ini():
     """
 
     global mock_products
-    global assistant
-    global thread
 
     # initialize the openai endpoint
 
     size = random.randint(2, 15)
 
-    # this will be only used for generating the Mock catalog, this won't be
-    """
-     ** Here you define the mock catalog with a different role **
-    """
-    response_mock = openai.chat.completions.create(
+    response = openai.chat.completions.create(
         model="gpt-4o",
         messages=[
             {
                 "role": "system",
-                "content": "You are a helpful AI ShopBot system. You will give me adequate prompts for giving a good serving in a shopping context as mock catalogs"},
+                "content": "You are a helpful AI ShopBot assistant. You will give me adequate prompts for giving a good serving in a shopping context"},
             {
-                "role": "system",
+                "role": "user",
                 "content": "Can you give me a random Mock catalog of unique products with size of " +
                 str(size) +
                 " as json, with product_name, description, price, and stock_avail (as string between 'True' or 'False') fields? \n"}])
 
-    """
-     ** Here you define the assistant for the session **
-    """
-    # create the assistant here before to do any other call using the threads
-    assistant = client.beta.assistants.create(
-        name="Shopping Bot Assistant",
-        instructions="You are a helpful AI ShopBot assistant. You will give me adequate prompts for giving a good service in a shopping context. Use the provided functions to answer questions. Generate function outputs (in tools) depending on the received messages",
-        model="gpt-4o",
-        tools=tools
-    )
-
-    # now create the thread after you initialize the chatbot only after the
-    # initialization
-    thread = client.beta.threads.create()
-
-    mock_products = response_mock.choices[0].message.content
+    mock_products = response.choices[0].message.content
 
     # cut the json string only
     idx1 = mock_products.index('[')
@@ -643,8 +477,6 @@ def predict(Data=ShopData, DataProduct=ShopData_Product, db=db, tools=tools):
     global username
     global file_name
     global mock_products
-    global assistant
-    global thread
 
     inside = 0
 
@@ -660,59 +492,21 @@ def predict(Data=ShopData, DataProduct=ShopData_Product, db=db, tools=tools):
     text_sub_val = text_sub_val.replace('.', '')
     text_sub_val = text_sub_val.replace(',', '')
 
-    # create the messages here to the thread
-    message_catalog = client.beta.threads.messages.create(
-        thread_id=thread.id,
-        role="user",
-        content="The JSON input catalog is: " + mock_products + " \n"
+    response = openai.chat.completions.create(
+        model="gpt-4o",
+        messages=[
+            {"role": "system", "content": "Assistant, take the JSON string as the product catalog for responding " + " \n"},
+            {"role": "user", "content": "The JSON input catalog is: " + mock_products + " \n"},
+            {"role": "user", "content": "user: " + text_sub_val}
+        ],
+        tools=tools,
+        tool_choice={"type": "function", "function": {"name": "getProductInfo"}}
     )
 
-    # create the parsing message here to the thread
-    message_content = client.beta.threads.messages.create(
-        thread_id=thread.id,
-        role="user",
-        content="user: " + text_sub_val,
-    )
-
-    # create the run here and specify the tool_choice to make it easier and
-    # more efficient
-    run = client.beta.threads.runs.create_and_poll(
-        thread_id=thread.id,
-        assistant_id=assistant.id,
-        instructions="Give priority to this client! Return the tools that are activated by the user message",
-        tool_choice={
-            "type": "function",
-            "function": {
-                "name": "getProductInfo"}})
-
-    # parsing the tool output here after the requied action is processed
-    tool_outputs, tool_value_returned = run_handler_poll(run=run)
-
-    # send the tool outputs back to complete the run
-    if tool_outputs:
-        run = client.beta.threads.runs.submit_tool_outputs_and_poll(
-            thread_id=thread.id,
-            run_id=run.id,
-            tool_outputs=tool_outputs
-        )
-
-    # waiting for run to be completed
-    wait(
-        lambda: run.status == 'completed',
-        timeout_seconds=120,
-        waiting_for="run for being completed")
-
-    # receiving the corresponding payload
-    messages = client.beta.threads.messages.list(thread_id=thread.id)
-
-    # parse the response from the main query
-    response = messages.data[0].content[0].text.value
-
-    print(response, 'response_message')
+    response = response.choices[0].message
 
     # Step 2: determine if the response from the model includes a tool call.
-    tool_calls = tool_value_returned.tool_calls
-
+    tool_calls = response.tool_calls
     print(response, 'response', tool_calls, 'tool_calls')
 
     if tool_calls:
@@ -743,31 +537,16 @@ def predict(Data=ShopData, DataProduct=ShopData_Product, db=db, tools=tools):
         # invoke the GetProductInfo function the rest functions will be
         # executed inside
         response_text, image_path, product_query, product_name_def, price_def, description_def, stock_availability_def = getProductInfo(
-            productName=tool_value, mock_products=mock_products, text=text, tools=tools, thread=thread, assistant=assistant)
+            productName=tool_value, mock_products=mock_products, text=text, tools=tools)
     else:
-
-        # create the messages here to the thread
-        message_bye = client.beta.threads.messages.create(
-                thread_id=thread.id,
-                role="user",
-                content="user: " + text_sub_val
+        response = openai.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "user", "content": "user: " + text_sub_val}
+            ]
         )
 
-        # define a bye run
-        run_bye = client.beta.threads.runs.create_and_poll(
-                thread_id=thread.id,
-                assistant_id=assistant.id,
-        )
-
-        wait(
-              lambda: run_bye.status == 'completed',
-              timeout_seconds=60,
-              waiting_for="bye run for being completed")
-
-        # process message payload
-        messages_bye = client.beta.threads.messages.list(thread_id=thread.id)
-        response_text = messages.data[0].content[0].text.value
-
+        response_text = response.choices[0].message.content
         image_path = '../static/images/gray.jpg'
         product_query = False
 
