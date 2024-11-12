@@ -600,7 +600,7 @@ def predict(Data=ShopData, DataProduct=ShopData_Product, db=db, tools=tools):
             lst.append(int(line.strip()))
 
         # check if the ids are repeated
-        while id in lst:
+        while id_table in lst:
             id_table = random.randint(0, 100000)
 
         # create file with new ids to save in the database
