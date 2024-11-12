@@ -71,7 +71,7 @@ You can see in console the example of each **Mock catalog** that is generated ea
 
 ![image](https://github.com/user-attachments/assets/eec3dcd2-306f-4c2c-aeca-16d4f622f303)
 
-The **Mock catalog** will be generated with a random size between 2 and 15 different products. In this process, we are depending, ofc, on the way how the **gpt-4o** assistant is defining what type of **product_names** will be on a typical **Mock catalog**. 
+The **Mock catalog** will be generated with a random size between 2 and 15 different products. In this process, we are depending, of course, on the way how the **gpt-4o** assistant is defining what type of **product_names** will be on a typical **Mock catalog**. 
 
 Then after you interact with **ShopBot** you must refer to a complete string or substring related to the list **product_names** in the generated catalog, when a successful query is done, you must see something like this.
 
