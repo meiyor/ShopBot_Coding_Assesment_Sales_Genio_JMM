@@ -61,7 +61,7 @@ CORS(app)
 
 def checkStock(stock_value=None, mock_products=None):
     """
-    This functiomn Determines stock availability of a specified product based on GPT tool
+    This function Determines stock availability of a specified product based on GPT tool
     call information and mock product data.
 
     This function inspects the GPT model's tool call response to determine if a stock check
@@ -495,7 +495,7 @@ def predict(Data=ShopData, DataProduct=ShopData_Product, db=db, tools=tools):
     response = openai.chat.completions.create(
         model="gpt-4o",
         messages=[
-            {"role": "system", "content": "Assistant, take the JSON string as the product catalog for responding " + " \n"},
+            {"role": "system", "content": "Assistant, take the JSON string as the product catalog for responding, use the JSON input catalog for replying any user queries" + " \n"},
             {"role": "user", "content": "The JSON input catalog is: " + mock_products + " \n"},
             {"role": "user", "content": "user: " + text_sub_val}
         ],
