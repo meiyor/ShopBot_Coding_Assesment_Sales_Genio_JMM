@@ -300,7 +300,7 @@ def getProductInfo(
 
             wait(
                 lambda: run_product.status == 'completed',
-                timeout_seconds=60,
+                timeout_seconds=200,
                 waiting_for="product run for being completed")
 
             run_product = stream.data
@@ -369,7 +369,7 @@ def getProductInfo(
         # waiting for run to be completed
         wait(
             lambda: run_info.status == 'completed',
-            timeout_seconds=60,
+            timeout_seconds=200,
             waiting_for="run info for being completed")
 
         # receiving the corresponding payload
@@ -417,7 +417,7 @@ def getProductInfo(
         # waiting for run to be completed
         wait(
             lambda: run_check.status == 'completed',
-            timeout_seconds=60,
+            timeout_seconds=200,
             waiting_for="run check for being completed")
 
         # receiving the corresponding payload
@@ -718,7 +718,7 @@ def predict(Data=ShopData, DataProduct=ShopData_Product, db=db, tools=tools):
     # waiting for run to be completed
     wait(
         lambda: run.status == 'completed',
-        timeout_seconds=120,
+        timeout_seconds=360,
         waiting_for="run for being completed")
 
     # receiving the corresponding payload
@@ -785,7 +785,7 @@ def predict(Data=ShopData, DataProduct=ShopData_Product, db=db, tools=tools):
 
         wait(
             lambda: run_bye.status == 'completed',
-            timeout_seconds=60,
+            timeout_seconds=200,
             waiting_for="bye run for being completed")
 
         # process message payload
@@ -873,6 +873,7 @@ def predict(Data=ShopData, DataProduct=ShopData_Product, db=db, tools=tools):
 if __name__ == "__main__":
     # create the table in the database
     # run the main in localhost
-    app.run(host='0.0.0.0', port=8000, debug=True)
+    # app.run(host='0.0.0.0', port=8000, debug=True)
+    app.run(port=8000, debug=True)
     # run this for Docker
     # app.run(host='0.0.0.0', port=8000, debug=True)
