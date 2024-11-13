@@ -761,6 +761,9 @@ def predict(Data=ShopData, DataProduct=ShopData_Product, db=db, tools=tools):
         # executed inside
         response_text, image_path, product_query, product_name_def, price_def, description_def, stock_availability_def = getProductInfo(
             productName=tool_value, mock_products=mock_products, text=text, tools=tools, thread=thread, assistant=assistant)
+
+        response_text = response + '<br>' + response_text
+
     else:
 
         # create the messages here to the thread
