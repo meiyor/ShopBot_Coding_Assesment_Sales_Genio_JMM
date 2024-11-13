@@ -539,7 +539,7 @@ def predict(Data=ShopData, DataProduct=ShopData_Product, db=db, tools=tools):
         response_text, image_path, product_query, product_name_def, price_def, description_def, stock_availability_def = getProductInfo(
             productName=tool_value, mock_products=mock_products, text=text, tools=tools)
 
-        response_text = response + '<br>' + response_text
+        response_text = response.content + '<br>' + response_text
 
     else:
         response = openai.chat.completions.create(
