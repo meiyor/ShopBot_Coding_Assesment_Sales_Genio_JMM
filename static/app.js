@@ -126,10 +126,15 @@ class Chatbox {
             return;
         }
 
+        document.querySelector('.send__button').disabled = true;
+        document.querySelector('.chatbox__support').disabled = true;
+        chatbox.querySelector('input').disabled = true;
+
         let msg1 = { name: "User", message: "<b>" + user_global + '</b>: '+ text1 }
 
         this.messages.push(msg1);
         this.updateChatText(chatbox,1)
+
 
         await fetch(server+'/predict', {
             method: 'POST',
@@ -151,6 +156,9 @@ class Chatbox {
             imgEl.src = r.file_name;
             imgEl.style.display = "block";
             r.file_name
+            document.querySelector('.send__button').disabled = false;
+            document.querySelector('.chatbox__support').disabled = false;
+            chatbox.querySelector('input').disabled = false;
 
 
         }).catch((error) => {
