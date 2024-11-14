@@ -495,7 +495,7 @@ def predict(Data=ShopData, DataProduct=ShopData_Product, db=db, tools=tools):
     response = openai.chat.completions.create(
         model="gpt-4o",
         messages=[
-            {"role": "system", "content": "Assistant, take the JSON string as the product catalog for responding, use the JSON input catalog for replying any user queries" + " \n"},
+            {"role": "system", "content": "Assistant, take the JSON string as the product catalog for responding, use the JSON input catalog for replying any user queries. Also response the queries given by the user" + " \n"},
             {"role": "user", "content": "The JSON input catalog is: " + mock_products + " \n"},
             {"role": "user", "content": "user: " + text_sub_val}
         ],
